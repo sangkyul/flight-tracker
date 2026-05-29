@@ -122,6 +122,12 @@ def update(preset_id):
         return render_template("preset_form.html", preset=preset, cabin_classes=CABIN_CLASSES,
                                errors=errors, form=request.form)
     data = _build_preset_from_form(request.form)
+    # If the label was the old auto-generated "ORIGIN→DESTINATION", update it
+    old_auto_label = f"{preset.origin}→{preset.destination}"
+    if data["label"] == old_auto_label or not data["label"]:
+        new_origin = request.form.get("origin", "").strip().upper()
+        new_dest = request.form.get("destination", "").strip().upper()
+        data["label"] = f"{new_origin}→{new_dest}"
     for key, val in data.items():
         setattr(preset, key, val)
     # Clear history and reset tracking start date
