@@ -193,11 +193,32 @@
 
 {% if preset %}
 <script>
+// Force Flatpickr to commit any typed-but-not-blurred values before submission
+function commitAllPickers() {
+  [fpDepartFrom, fpDepartTo, fpReturnFrom, fpReturnTo].forEach(fp => {
+    if (fp.altInput && fp.altInput.value && !fp.selectedDates[0]) {
+      fp.setDate(fp.altInput.value, true, fp.config.altFormat);
+    }
+  });
+}
+
 document.getElementById('submitBtn').addEventListener('click', function(e) {
   e.preventDefault();
+  commitAllPickers();
   if (confirm('Editing this route will erase all price history and alerts for it. A fresh search will run automatically.\n\nAre you sure?')) {
     this.closest('form').submit();
   }
+});
+</script>
+{% else %}
+<script>
+// For new routes: commit typed dates before form submits
+document.getElementById('submitBtn').addEventListener('click', function() {
+  [fpDepartFrom, fpDepartTo, fpReturnFrom, fpReturnTo].forEach(fp => {
+    if (fp.altInput && fp.altInput.value && !fp.selectedDates[0]) {
+      fp.setDate(fp.altInput.value, true, fp.config.altFormat);
+    }
+  });
 });
 </script>
 {% endif %}
@@ -396,9 +417,10 @@ const fpReturnFrom = flatpickr('#return_date_from', {
     if (!instance.selectedDates[0]) {
       const fromDate = fpDepartFrom.selectedDates[0];
       if (fromDate) {
-        instance.currentYear  = fromDate.getFullYear();
-        instance.currentMonth = fromDate.getMonth();
-        instance.redraw();
+        setTimeout(() => {
+          instance.changeYear(fromDate.getFullYear());
+          instance.changeMonth(fromDate.getMonth(), false);
+        }, 0);
       }
     }
   },

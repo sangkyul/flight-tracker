@@ -44,7 +44,14 @@
 
         <div class="mb-1 text-muted small">
           <i class="bi bi-calendar3 me-1"></i>
-          {{ preset.depart_date_from.strftime('%b %d') }} – {{ preset.depart_date_to.strftime('%b %d, %Y') }}
+          {% if preset.depart_date_from == preset.depart_date_to %}
+            {{ preset.depart_date_from.strftime('%b %d, %Y') }}
+          {% else %}
+            {{ preset.depart_date_from.strftime('%b %d') }} – {{ preset.depart_date_to.strftime('%b %d, %Y') }}
+          {% endif %}
+          {% if preset.return_date_from %}
+            &nbsp;↩ Return {{ preset.return_date_from.strftime('%b %d') }}{% if preset.return_date_to and preset.return_date_to != preset.return_date_from %} – {{ preset.return_date_to.strftime('%b %d, %Y') }}{% else %}, {{ preset.return_date_from.strftime('%Y') }}{% endif %}
+          {% endif %}
         </div>
         <div class="mb-1 text-muted small">
           <i class="bi bi-stopwatch me-1"></i>Tracking since {{ preset.created_at.strftime('%b %d, %Y') }}
