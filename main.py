@@ -35,7 +35,9 @@ def seed_default_settings():
 
 
 with app.app_context():
-    os.makedirs(os.path.join(os.path.dirname(__file__), "instance"), exist_ok=True)
+    # instance/ dir only needed for local SQLite — skip on PostgreSQL (Vercel/production)
+    if not os.environ.get("DATABASE_URL"):
+        os.makedirs(os.path.join(os.path.dirname(__file__), "instance"), exist_ok=True)
     db.create_all()
     seed_default_settings()
     # Add sort_order column if upgrading from an older DB
