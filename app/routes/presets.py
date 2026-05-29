@@ -44,12 +44,10 @@ def _validate_preset(form) -> list[str]:
 
     rf = _parse_date(form.get("return_date_from"))
     rt = _parse_date(form.get("return_date_to"))
-    if rf or rt:
-        if not rf or not rt:
-            errors.append("Both return dates are required for a round trip.")
-        elif df and rf <= df:
+    if rf:
+        if df and rf <= df:
             errors.append("Return date must be after the departure date.")
-        elif rt < rf:
+        if rt and rt < rf:
             errors.append("Return end date must be on or after return start date.")
 
     cabin = form.get("cabin_class", "ECONOMY")
@@ -82,7 +80,7 @@ def _build_preset_from_form(form) -> dict:
         "depart_date_from": _parse_date(form.get("depart_date_from")),
         "depart_date_to": _parse_date(form.get("depart_date_to")) or _parse_date(form.get("depart_date_from")),
         "return_date_from": _parse_date(form.get("return_date_from")) or None,
-        "return_date_to": _parse_date(form.get("return_date_to")) or None,
+        "return_date_to": _parse_date(form.get("return_date_to")) or _parse_date(form.get("return_date_from")) or None,
         "cabin_class": form.get("cabin_class", "ECONOMY"),
         "adults": max(1, int(form.get("adults", 1) or 1)),
         "direct_only": bool(form.get("direct_only")),
