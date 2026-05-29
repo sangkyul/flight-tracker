@@ -1,0 +1,23 @@
+# Secrets
+.env
+.env.*
+
+# Local database
+instance/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+.venv/
+venv/
+
+# Stray files
+=2.31
+
+# IDE
+.vscode/
+.idea/

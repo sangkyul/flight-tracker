@@ -1,0 +1,221 @@
+{% extends "base.html" %}
+{% block title %}{{ preset.origin }} → {{ preset.destination }} History — Flight Tracker{% endblock %}
+
+{% block content %}
+<nav aria-label="breadcrumb" class="mb-3">
+  <ol class="breadcrumb">
+    <li class="breadcrumb-item"><a href="{{ url_for('dashboard.index') }}">Dashboard</a></li>
+    <li class="breadcrumb-item active">{{ preset.label }}</li>
+  </ol>
+</nav>
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h1 class="h3 mb-0">
+    {{ preset.origin }} <i class="bi bi-arrow-right"></i> {{ preset.destination }}
+    <span class="badge bg-secondary fs-6 fw-normal ms-1">{{ preset.cabin_class.replace('_', ' ') }}</span>
+  </h1>
+  <a href="{{ url_for('presets.edit_form', preset_id=preset.id) }}" class="btn btn-outline-secondary btn-sm">
+    <i class="bi bi-pencil me-1"></i>Edit
+  </a>
+</div>
+
+<!-- Stat cards -->
+<div class="row g-3 mb-4">
+  <div class="col-6 col-md-3">
+    <div class="card text-center p-3">
+      <div class="text-muted small mb-1">Latest Price</div>
+      <div class="fw-bold fs-4">{{ (record_currency|currency_sym) + (latest_price|fmt_price) if latest_price else '—' }}</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card text-center p-3">
+      <div class="text-muted small mb-1">30-day Average</div>
+      {% if rolling_avg_direct %}
+      <div class="fw-bold">{{ (record_currency|currency_sym) + (rolling_avg_direct|fmt_price) }} <span class="text-muted fw-normal" style="font-size:.75rem">direct</span></div>
+      {% endif %}
+      {% if rolling_avg_indirect %}
+      <div class="fw-bold">{{ (record_currency|currency_sym) + (rolling_avg_indirect|fmt_price) }} <span class="text-muted fw-normal" style="font-size:.75rem">connecting</span></div>
+      {% endif %}
+      {% if not rolling_avg_direct and not rolling_avg_indirect %}<div class="fw-bold fs-4">—</div><div class="text-muted" style="font-size:0.7rem">Need 3+ data points</div>{% endif %}
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card text-center p-3">
+      <div class="text-muted small mb-1">Lowest Ever</div>
+      <div class="fw-bold fs-4 text-success">{{ (record_currency|currency_sym) + (lowest_price|fmt_price) if lowest_price else '—' }}</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card text-center p-3">
+      <div class="text-muted small mb-1">Alerts Sent</div>
+      <div class="fw-bold fs-4">{{ alerts_sent }}</div>
+    </div>
+  </div>
+</div>
+
+{% if records %}
+<!-- Chart -->
+<div class="card mb-4">
+  <div class="card-body">
+    <canvas id="priceChart" height="80"></canvas>
+  </div>
+</div>
+
+<!-- Records table -->
+<div class="card">
+  <div class="card-header fw-semibold">Price History</div>
+  <div class="table-responsive">
+    <table class="table table-hover mb-0" style="font-size:.9rem">
+      <thead class="table-light">
+        <tr>
+          <th>Checked</th>
+          <th class="text-primary">Direct</th>
+          <th class="text-secondary">Connecting</th>
+          <th>Alert</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in grouped_records %}
+        <tr {% if row.alerted %}class="table-success"{% endif %}>
+          <td class="text-nowrap">{{ row.checked_at.strftime('%b %d, %H:%M') }} UTC</td>
+
+          {# Direct column #}
+          <td>
+            {% if row.direct %}
+              <span class="fw-semibold">{{ row.direct.currency | currency_sym }}{{ row.direct.price | fmt_price }}</span>
+              {% if row.direct.carrier %}<span class="text-muted ms-1" style="font-size:.8rem">{{ row.direct.carrier }}</span>{% endif %}
+              {% if row.direct.outbound_date %}<div class="text-muted" style="font-size:.78rem">{{ row.direct.outbound_date.strftime('%b %d') }}</div>{% endif %}
+            {% else %}
+              <span class="text-muted">—</span>
+            {% endif %}
+          </td>
+
+          {# Connecting column #}
+          <td>
+            {% if row.indirect %}
+              <span class="fw-semibold">{{ row.indirect.currency | currency_sym }}{{ row.indirect.price | fmt_price }}</span>
+              {% if row.indirect.carrier %}<span class="text-muted ms-1" style="font-size:.8rem">{{ row.indirect.carrier }}</span>{% endif %}
+              {% if row.indirect.outbound_date %}<div class="text-muted" style="font-size:.78rem">{{ row.indirect.outbound_date.strftime('%b %d') }}</div>{% endif %}
+            {% else %}
+              <span class="text-muted">—</span>
+            {% endif %}
+          </td>
+
+          <td>
+            {% if row.alerted %}
+              <span class="badge bg-success"><i class="bi bi-bell-fill"></i> Sent</span>
+            {% else %}
+              <span class="text-muted">—</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% else %}
+<div class="text-center py-5 text-muted">
+  <i class="bi bi-graph-up display-3"></i>
+  <p class="mt-3">No price data yet. Run a search from the dashboard to get started.</p>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+{% if records %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+<script>
+const labels        = {{ chart_labels|safe }};
+const directData    = {{ chart_direct|safe }};
+const indirectData  = {{ chart_indirect|safe }};
+const threshold     = {{ preset.price_threshold or 'null' }};
+const avgDirect     = {{ rolling_avg_direct or 'null' }};
+const avgIndirect   = {{ rolling_avg_indirect or 'null' }};
+const SYM           = {{ (record_currency or current_currency)|currency_sym|tojson }};
+
+const hasAnyDirect   = directData.some(v => v !== null);
+const hasAnyIndirect = indirectData.some(v => v !== null);
+
+const datasets = [];
+
+if (hasAnyDirect) {
+  datasets.push({
+    label: 'Direct',
+    data: directData,
+    borderColor: '#0d6efd',
+    backgroundColor: 'rgba(13,110,253,0.07)',
+    tension: 0.3,
+    fill: true,
+    pointRadius: 4,
+    spanGaps: true,
+  });
+}
+
+if (hasAnyIndirect) {
+  datasets.push({
+    label: 'Connecting',
+    data: indirectData,
+    borderColor: '#6c757d',
+    backgroundColor: 'rgba(108,117,125,0.07)',
+    tension: 0.3,
+    fill: true,
+    pointRadius: 4,
+    spanGaps: true,
+  });
+}
+
+if (threshold) {
+  datasets.push({
+    label: 'Your threshold',
+    data: labels.map(() => threshold),
+    borderColor: '#dc3545',
+    borderDash: [6, 4],
+    borderWidth: 1.5,
+    pointRadius: 0,
+    fill: false,
+  });
+}
+
+if (avgDirect) {
+  datasets.push({
+    label: '30-day avg (direct)',
+    data: labels.map(() => avgDirect),
+    borderColor: '#0d6efd',
+    borderDash: [4, 4],
+    borderWidth: 1.5,
+    pointRadius: 0,
+    fill: false,
+  });
+}
+
+if (avgIndirect) {
+  datasets.push({
+    label: '30-day avg (connecting)',
+    data: labels.map(() => avgIndirect),
+    borderColor: '#6c757d',
+    borderDash: [4, 4],
+    borderWidth: 1.5,
+    pointRadius: 0,
+    fill: false,
+  });
+}
+
+new Chart(document.getElementById('priceChart'), {
+  type: 'line',
+  data: { labels, datasets },
+  options: {
+    responsive: true,
+    plugins: {
+      legend: { position: 'top' },
+      tooltip: { callbacks: { label: ctx => ' ' + SYM + ctx.parsed.y.toLocaleString() } }
+    },
+    scales: {
+      y: { ticks: { callback: v => SYM + v.toLocaleString() } }
+    }
+  }
+});
+</script>
+{% endif %}
+{% endblock %}

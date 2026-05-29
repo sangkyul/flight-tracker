@@ -1,0 +1,517 @@
+{% extends "base.html" %}
+{% block title %}Dashboard — Flight Tracker{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h1 class="h3 mb-0">Monitored Routes</h1>
+  <div class="d-flex gap-2">
+    <button id="runNowBtn" class="btn btn-outline-primary btn-sm">
+      <i class="bi bi-play-circle me-1"></i>Run Now
+    </button>
+    <a href="{{ url_for('presets.new_form') }}" class="btn btn-primary btn-sm">
+      <i class="bi bi-plus-circle me-1"></i>Add Route
+    </a>
+  </div>
+</div>
+
+<p class="text-muted small mb-4">
+  Last run: <span id="lastRun">{{ last_run }}</span> &nbsp;|&nbsp;
+  Next run: <span id="nextRun">{{ next_run }}</span>
+</p>
+
+{% if presets %}
+<div class="row g-3" id="presetGrid">
+  {% for preset in presets %}
+  <div class="col-md-6 col-xl-4" data-preset-id="{{ preset.id }}">
+    <div class="card h-100">
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-start mb-2">
+          <span class="route-badge text-primary">
+            {{ preset.origin }} <i class="bi bi-arrow-right"></i> {{ preset.destination }}
+          </span>
+          <div class="form-check form-switch mb-0">
+            <input class="form-check-input toggle-active" type="checkbox"
+                   data-preset-id="{{ preset.id }}"
+                   {% if preset.active %}checked{% endif %}>
+          </div>
+        </div>
+
+        <div class="mb-2">
+          <span class="badge bg-secondary">{{ preset.cabin_class.replace('_', ' ') }}</span>
+          {% if preset.direct_only %}<span class="badge bg-info text-dark">Direct only</span>{% endif %}
+          {% if preset.is_round_trip %}<span class="badge bg-light text-dark border">Round trip</span>{% endif %}
+        </div>
+
+        <div class="mb-1 text-muted small">
+          <i class="bi bi-calendar3 me-1"></i>
+          {{ preset.depart_date_from.strftime('%b %d') }} – {{ preset.depart_date_to.strftime('%b %d, %Y') }}
+        </div>
+        <div class="mb-1 text-muted small">
+          <i class="bi bi-stopwatch me-1"></i>Tracking since {{ preset.created_at.strftime('%b %d, %Y') }}
+        </div>
+
+        {% set tp = tile_prices[preset.id] %}
+        {% set t_direct = tp.direct %}
+        {% set t_indirect = tp.indirect %}
+        {% set t_any = t_direct or t_indirect %}
+        <div id="tile-price-area-{{ preset.id }}">
+        {% if t_any %}
+        <div class="mt-2">
+          <div class="d-flex justify-content-between align-items-baseline">
+            <small class="text-muted me-2">Direct</small>
+            {% if t_direct %}
+            <span class="fw-semibold {% if preset.price_threshold and t_direct.price <= preset.price_threshold %}text-success{% endif %}"
+                  id="tile-direct-value-{{ preset.id }}">
+              {{ t_direct.currency | currency_sym }}{{ t_direct.price | fmt_price }} {{ t_direct.currency }}
+            </span>
+            {% else %}
+            <span class="text-muted fst-italic" id="tile-direct-value-{{ preset.id }}">—</span>
+            {% endif %}
+          </div>
+          {% if not preset.direct_only %}
+          <div class="d-flex justify-content-between align-items-baseline">
+            <small class="text-muted me-2">Connecting</small>
+            {% if t_indirect %}
+            <span class="text-muted" id="tile-indirect-value-{{ preset.id }}">
+              {{ t_indirect.currency | currency_sym }}{{ t_indirect.price | fmt_price }} {{ t_indirect.currency }}
+            </span>
+            {% else %}
+            <span class="text-muted fst-italic" id="tile-indirect-value-{{ preset.id }}">—</span>
+            {% endif %}
+          </div>
+          {% endif %}
+          <div class="text-muted small mt-1" id="tile-checked-{{ preset.id }}">
+            Checked {{ (t_direct or t_indirect).checked_at.strftime('%b %d, %H:%M') }} UTC
+          </div>
+          {% if preset.price_threshold %}
+          <div class="text-muted small">
+            Threshold: {{ (t_direct or t_indirect).currency | currency_sym }}{{ preset.price_threshold | fmt_price }}
+          </div>
+          {% endif %}
+        </div>
+        {% else %}
+        <div class="text-muted mt-3 fst-italic" id="tile-nodata-{{ preset.id }}">No data yet — run a search to see prices.</div>
+        {% endif %}
+        </div>
+      </div>
+
+      <div class="px-3 pb-2">
+        <div class="row g-2">
+          <div class="col-6">
+            <div class="text-muted" style="font-size:0.7rem;font-weight:600;letter-spacing:.04em;">DIRECT</div>
+            <canvas id="chart-direct-{{ preset.id }}" height="140"></canvas>
+          </div>
+          <div class="col-6">
+            <div class="text-muted" style="font-size:0.7rem;font-weight:600;letter-spacing:.04em;">CONNECTING</div>
+            <canvas id="chart-indirect-{{ preset.id }}" height="140"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <div class="card-footer bg-transparent border-0 d-flex gap-2">
+        <a href="{{ url_for('history.view', preset_id=preset.id) }}" class="btn btn-outline-secondary btn-sm flex-fill">
+          <i class="bi bi-graph-up me-1"></i>History
+        </a>
+        <a href="{{ url_for('presets.edit_form', preset_id=preset.id) }}" class="btn btn-outline-secondary btn-sm flex-fill">
+          <i class="bi bi-pencil me-1"></i>Edit
+        </a>
+        <form method="post" action="{{ url_for('presets.delete', preset_id=preset.id) }}"
+              onsubmit="return confirm('Delete this preset and all its history?')">
+          <button type="submit" class="btn btn-outline-danger btn-sm">
+            <i class="bi bi-trash"></i>
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+{% else %}
+<div class="text-center py-5">
+  <i class="bi bi-airplane display-1 text-muted"></i>
+  <h4 class="mt-3 text-muted">No routes tracked yet</h4>
+  <p class="text-muted">Add your first route to start monitoring flight prices.</p>
+  <a href="{{ url_for('presets.new_form') }}" class="btn btn-primary mt-2">
+    <i class="bi bi-plus-circle me-1"></i>Add your first route
+  </a>
+</div>
+{% endif %}
+
+<!-- Run Now status bar -->
+<div id="runStatus" class="alert mt-4" style="display:none;"></div>
+
+<!-- Flight results section -->
+<div id="flightResults" class="mt-4" style="display:none;">
+  <h4 class="mb-3"><i class="bi bi-airplane me-2"></i>Search Results</h4>
+  <div id="flightResultsBody"></div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<style>
+  #presetGrid .card {
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+  }
+</style>
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+<script>
+const CURRENCY_SYMBOL = {{ {'GBP':'£','USD':'$','EUR':'€'}[current_currency] | tojson }};
+const CURRENCY_CODE   = {{ current_currency | tojson }};
+
+// ── Helpers ──────────────────────────────────────────────────────────────────
+
+function fmtTime(t) {
+  if (!t) return '—';
+  // SerpAPI returns "YYYY-MM-DD HH:MM" or just "HH:MM"
+  const parts = t.split(' ');
+  return parts.length > 1 ? parts[1] : parts[0];
+}
+
+function fmtDate(iso) {
+  if (!iso) return '—';
+  const [y, m, d] = iso.split('-').map(Number);
+  return new Date(y, m - 1, d).toLocaleDateString('en-GB', {day:'numeric', month:'short'});
+}
+
+function fmtDuration(mins) {
+  if (!mins) return '—';
+  const h = Math.floor(mins / 60), m = mins % 60;
+  return h > 0 ? `${h}h ${m > 0 ? m + 'm' : ''}`.trim() : `${m}m`;
+}
+
+function fmtPrice(p) {
+  return CURRENCY_SYMBOL + Number(p).toLocaleString('en-GB', {maximumFractionDigits: 0}) + ' ' + CURRENCY_CODE;
+}
+
+// ── Build a flight table ──────────────────────────────────────────────────────
+
+function buildFlightTable(flights, cheapestPrice) {
+  if (!flights || !flights.length) {
+    return '<p class="text-muted fst-italic mb-0">No flights found for this category.</p>';
+  }
+
+  const rows = flights.map(f => {
+    const isCheapest = f.price === cheapestPrice;
+    const rowClass = isCheapest ? 'table-success fw-semibold' : '';
+    const stopBadge = f.stops === 0
+      ? '<span class="badge bg-success">Direct</span>'
+      : `<span class="badge bg-secondary">${f.stops} stop${f.stops > 1 ? 's' : ''}</span>`;
+    const cheapTag = isCheapest ? ' <span class="badge bg-warning text-dark ms-1">Cheapest</span>' : '';
+
+    return `<tr class="${rowClass}">
+      <td>${fmtDate(f.outbound_date)}</td>
+      <td>${fmtTime(f.dep_time)}</td>
+      <td>${fmtTime(f.arr_time)}</td>
+      <td>${fmtDuration(f.duration_minutes)}</td>
+      <td>${f.airline || f.carrier || '—'}</td>
+      <td>${stopBadge}</td>
+      <td>${fmtPrice(f.price)}${cheapTag}</td>
+    </tr>`;
+  }).join('');
+
+  return `<div class="table-responsive">
+    <table class="table table-hover table-sm mb-0" style="font-size:.875rem">
+      <thead class="table-light">
+        <tr>
+          <th>Date</th><th>Departs</th><th>Arrives</th>
+          <th>Duration</th><th>Airline</th><th>Stops</th><th>Price</th>
+        </tr>
+      </thead>
+      <tbody>${rows}</tbody>
+    </table>
+  </div>`;
+}
+
+// ── Render results for all presets ────────────────────────────────────────────
+
+function renderResults(results) {
+  const container = document.getElementById('flightResultsBody');
+  container.innerHTML = '';
+
+  results.forEach((r, idx) => {
+    const allFlights = [...(r.direct || []), ...(r.indirect || [])];
+    const cheapestPrice = allFlights.length
+      ? Math.min(...allFlights.map(f => f.price))
+      : null;
+
+    const hasFlights = (r.direct && r.direct.length) || (r.indirect && r.indirect.length);
+
+    const errorHtml = r.error
+      ? `<div class="alert alert-danger mb-0">Error: ${r.error}</div>`
+      : '';
+
+    const directHtml  = buildFlightTable(r.direct,   cheapestPrice);
+    const indirectHtml = buildFlightTable(r.indirect, cheapestPrice);
+
+    const alertBadge = r.alerted
+      ? '<span class="badge bg-success ms-2"><i class="bi bi-bell-fill"></i> Alert sent</span>'
+      : '';
+
+    const countText = r.checked
+      ? `<span class="text-muted small ms-2">${r.checked} offer${r.checked !== 1 ? 's' : ''} found</span>`
+      : '';
+
+    const card = document.createElement('div');
+    card.className = 'card mb-3';
+    card.innerHTML = `
+      <div class="card-header d-flex align-items-center gap-2 fw-semibold">
+        <i class="bi bi-airplane text-primary"></i>
+        ${r.preset_label || r.preset_route}
+        ${countText}${alertBadge}
+      </div>
+      <div class="card-body p-0">
+        ${errorHtml}
+        ${hasFlights ? `
+        <div class="p-3 pb-1">
+          <h6 class="text-success mb-2"><i class="bi bi-arrow-right-circle me-1"></i>Direct Flights — Top 5 Cheapest</h6>
+          ${directHtml}
+        </div>
+        <hr class="my-0">
+        <div class="p-3 pb-1">
+          <h6 class="text-secondary mb-2"><i class="bi bi-arrow-left-right me-1"></i>Connecting Flights — Top 5 Cheapest</h6>
+          ${indirectHtml}
+        </div>
+        ` : (!r.error ? '<p class="text-muted fst-italic p-3 mb-0">No flights found. Check your route, dates, and SerpAPI key.</p>' : '')}
+      </div>`;
+    container.appendChild(card);
+  });
+
+  document.getElementById('flightResults').style.display = 'block';
+  document.getElementById('flightResults').scrollIntoView({behavior: 'smooth', block: 'start'});
+}
+
+// ── Active toggle ─────────────────────────────────────────────────────────────
+
+document.querySelectorAll('.toggle-active').forEach(el => {
+  el.addEventListener('change', function () {
+    fetch(`/presets/${this.dataset.presetId}/toggle`, {method: 'POST'})
+      .then(r => r.json())
+      .then(data => { this.checked = data.active; });
+  });
+});
+
+// ── Run Now ───────────────────────────────────────────────────────────────────
+
+document.getElementById('runNowBtn').addEventListener('click', function () {
+  const btn    = this;
+  const status = document.getElementById('runStatus');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Searching…';
+  status.style.display = 'none';
+  document.getElementById('flightResults').style.display = 'none';
+
+  fetch('/api/trigger', {method: 'POST'})
+    .then(r => r.json())
+    .then(data => {
+      btn.disabled = false;
+      btn.innerHTML = '<i class="bi bi-play-circle me-1"></i>Run Now';
+
+      if (data.status === 'ok') {
+        const results = data.results || [];
+        const alerted = results.filter(r => r.alerted).length;
+        status.className = 'alert alert-success mt-4';
+        status.innerHTML = `Search complete — ${results.length} route(s) checked, ${alerted} alert(s) sent.`;
+        status.style.display = 'block';
+        if (results.length) { renderResults(results); updateTilePrices(results); }
+      } else {
+        status.className = 'alert alert-danger mt-4';
+        status.innerHTML = 'Error: ' + (data.message || 'Unknown error');
+        status.style.display = 'block';
+      }
+    })
+    .catch(() => {
+      btn.disabled = false;
+      btn.innerHTML = '<i class="bi bi-play-circle me-1"></i>Run Now';
+      status.className = 'alert alert-danger mt-4';
+      status.innerHTML = 'Network error — is the server running?';
+      status.style.display = 'block';
+    });
+});
+
+// ── Auto-run on redirect from create/edit ─────────────────────────────────────
+
+if (new URLSearchParams(window.location.search).get('autorun') === '1') {
+  history.replaceState(null, '', '/');
+  document.getElementById('runNowBtn').click();
+}
+
+// ── Status refresh ────────────────────────────────────────────────────────────
+
+fetch('/api/status').then(r => r.json()).then(data => {
+  if (data.last_run) document.getElementById('lastRun').textContent = data.last_run;
+  if (data.next_run) document.getElementById('nextRun').textContent = data.next_run;
+});
+
+// ── Drag-and-drop tile reordering ────────────────────────────────────────────
+
+const grid = document.getElementById('presetGrid');
+if (grid) {
+  Sortable.create(grid, {
+    animation: 150,
+    handle: '.card',
+    ghostClass: 'opacity-50',
+    delay: 500,
+    delayOnTouchOnly: true,
+    onEnd() {
+      const order = [...grid.querySelectorAll('[data-preset-id]')]
+        .map(el => parseInt(el.dataset.presetId));
+      fetch('/api/reorder', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({order}),
+      });
+    },
+  });
+}
+
+// ── Per-card price history mini charts ───────────────────────────────────────
+
+const CHART_DATA = {{ chart_data_json | safe }};
+
+const miniCharts = {};
+
+function makeMiniChart(canvas, labels, prices, color) {
+  if (!canvas) return null;
+  const hasData = prices && prices.some(v => v !== null);
+  if (!hasData) {
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#adb5bd';
+    ctx.font = '10px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('No data', canvas.offsetWidth / 2 || 60, 50);
+    return null;
+  }
+  const nonNull = prices.filter(v => v !== null);
+  const singleDay = nonNull.length === 1;
+
+  function fmtLabel(iso) {
+    const [, m, d] = iso.split('-');
+    return ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][+m - 1] + ' ' + +d;
+  }
+
+  return new Chart(canvas, {
+    type: 'line',
+    data: {
+      labels: [...labels],
+      datasets: [{
+        data: [...prices],
+        borderColor: color,
+        backgroundColor: color.replace(')', ',0.08)').replace('rgb', 'rgba'),
+        tension: 0.3,
+        fill: !singleDay,
+        pointRadius: singleDay ? 5 : 3,
+        showLine: !singleDay,
+        spanGaps: true,
+      }],
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: {
+          title: items => fmtLabel(items[0].label),
+          label: ctx => ' ' + CURRENCY_SYMBOL + ctx.parsed.y.toLocaleString(),
+        }},
+      },
+      scales: {
+        x: { ticks: { font: { size: 9 }, maxTicksLimit: 5, callback: (_, i, ticks) => fmtLabel(labels[ticks[i]?.value ?? i] ?? '') } },
+        y: { ticks: { callback: v => CURRENCY_SYMBOL + v.toLocaleString(), font: { size: 9 } } },
+      },
+    },
+  });
+}
+
+Object.entries(CHART_DATA).forEach(([presetId, data]) => {
+  miniCharts[presetId] = {
+    direct: makeMiniChart(
+      document.getElementById('chart-direct-' + presetId),
+      data ? data.labels : [], data ? data.direct : [], 'rgb(13,110,253)'
+    ),
+    indirect: makeMiniChart(
+      document.getElementById('chart-indirect-' + presetId),
+      data ? data.labels : [], data ? data.indirect : [], 'rgb(108,117,125)'
+    ),
+  };
+});
+
+function updateMiniChartPoint(chart, canvas, label, price, color) {
+  if (price === null || price === undefined) return;
+  if (!chart) {
+    // Was "No data" — create fresh
+    const ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    return makeMiniChart(canvas, [label], [price], color);
+  }
+  const labels = chart.data.labels;
+  const data   = chart.data.datasets[0].data;
+  const idx    = labels.lastIndexOf(label);
+  if (idx >= 0) {
+    data[idx] = price;
+  } else {
+    labels.push(label);
+    data.push(price);
+  }
+  chart.update();
+  return chart;
+}
+
+function updateTilePrices(results) {
+  const now = new Date();
+  const todayLabel = now.toISOString().split('T')[0]; // YYYY-MM-DD
+  const timeStr = now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+
+  results.forEach(r => {
+    const id = r.preset_id;
+    const directPrice   = r.direct   && r.direct.length   ? r.direct[0].price   : null;
+    const indirectPrice = r.indirect && r.indirect.length ? r.indirect[0].price : null;
+
+    if (directPrice === null && indirectPrice === null) return;
+
+    const priceArea = document.getElementById('tile-price-area-' + id);
+    if (!priceArea) return;
+
+    const noData = document.getElementById('tile-nodata-' + id);
+    if (noData) {
+      // First result — inject two-row price layout
+      priceArea.innerHTML = `
+        <div class="mt-2">
+          <div class="d-flex justify-content-between align-items-baseline">
+            <small class="text-muted me-2">Direct</small>
+            <span class="fw-semibold" id="tile-direct-value-${id}">${directPrice !== null ? fmtPrice(directPrice) : '—'}</span>
+          </div>
+          <div class="d-flex justify-content-between align-items-baseline">
+            <small class="text-muted me-2">Connecting</small>
+            <span class="text-muted" id="tile-indirect-value-${id}">${indirectPrice !== null ? fmtPrice(indirectPrice) : '—'}</span>
+          </div>
+          <div class="text-muted small mt-1" id="tile-checked-${id}">Checked just now</div>
+        </div>`;
+    } else {
+      const directEl   = document.getElementById('tile-direct-value-'   + id);
+      const indirectEl = document.getElementById('tile-indirect-value-' + id);
+      const checkedEl  = document.getElementById('tile-checked-'        + id);
+      if (directEl   && directPrice   !== null) directEl.textContent   = fmtPrice(directPrice);
+      if (indirectEl && indirectPrice !== null) indirectEl.textContent = fmtPrice(indirectPrice);
+      if (checkedEl) checkedEl.textContent = `Checked ${todayLabel}, ${timeStr} UTC`;
+    }
+
+    // Update mini charts
+    if (!miniCharts[id]) miniCharts[id] = { direct: null, indirect: null };
+    miniCharts[id].direct = updateMiniChartPoint(
+      miniCharts[id].direct,
+      document.getElementById('chart-direct-' + id),
+      todayLabel, directPrice, 'rgb(13,110,253)'
+    );
+    miniCharts[id].indirect = updateMiniChartPoint(
+      miniCharts[id].indirect,
+      document.getElementById('chart-indirect-' + id),
+      todayLabel, indirectPrice, 'rgb(108,117,125)'
+    );
+  });
+}
+</script>
+{% endblock %}
