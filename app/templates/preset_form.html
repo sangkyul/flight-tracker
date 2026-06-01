@@ -206,14 +206,18 @@ document.getElementById('submitBtn').addEventListener('click', function(e) {
   e.preventDefault();
   commitAllPickers();
   if (confirm('Editing this route will erase all price history and alerts for it. A fresh search will run automatically.\n\nAre you sure?')) {
+    this.disabled = true;
+    this.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Saving…';
     this.closest('form').submit();
   }
 });
 </script>
 {% else %}
 <script>
-// For new routes: commit typed dates before form submits
+// For new routes: commit typed dates before form submits, then disable to prevent double-submit
 document.getElementById('submitBtn').addEventListener('click', function() {
+  this.disabled = true;
+  this.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Adding…';
   [fpDepartFrom, fpDepartTo, fpReturnFrom, fpReturnTo].forEach(fp => {
     if (fp.altInput && fp.altInput.value && !fp.selectedDates[0]) {
       fp.setDate(fp.altInput.value, true, fp.config.altFormat);

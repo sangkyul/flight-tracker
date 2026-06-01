@@ -33,8 +33,6 @@ def check_preset(preset) -> dict:
     and returns a display-ready summary including top-5 direct and
     top-5 non-direct flights.
     """
-    all_flights = fetch_all_flights(preset)
-
     base = {
         "preset_id": preset.id,
         "preset_label": preset.label,
@@ -44,6 +42,15 @@ def check_preset(preset) -> dict:
         "checked": 0,
         "alerted": False,
     }
+
+    if not current_app.config.get("SERPAPI_KEY", ""):
+        base["error"] = (
+            "SERPAPI_KEY is not configured. "
+            "Add SERPAPI_KEY=your_key to your .env file and restart the server."
+        )
+        return base
+
+    all_flights = fetch_all_flights(preset)
 
     if not all_flights:
         return base
