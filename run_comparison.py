@@ -41,7 +41,9 @@ with app.app_context():
             cabin_class="ECONOMY", adults=1,
             direct_only=False, preferred_airline=None,
         )
-        flights = fetch_all_flights(preset)
+        flights, errors = fetch_all_flights(preset)
+        if errors:
+            print(f"  SerpAPI errors: {errors}")
         direct   = sorted([f for f in flights if f["stops"] == 0], key=lambda x: x["price"])[:5]
         indirect = sorted([f for f in flights if f["stops"] > 0],  key=lambda x: x["price"])[:5]
         all_results[key] = {"name": name, "date": dep_date, "direct": direct, "indirect": indirect, "total": len(flights)}
