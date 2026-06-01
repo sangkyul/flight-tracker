@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from app.database import db
 from app.models import PriceRecord
 
@@ -14,7 +14,7 @@ def compute_rolling_average(
     Pass stops=0 for direct-only average, stops=1 for connecting-only average.
     Omit stops (None) to average across all records.
     """
-    cutoff = datetime.utcnow() - timedelta(days=days)
+    cutoff = datetime.now(timezone.utc) - timedelta(days=days)
     q = (
         db.session.query(PriceRecord.price)
         .filter(

@@ -3,6 +3,9 @@ import os, sys
 from types import SimpleNamespace
 from datetime import date
 
+# Exit non-zero if any route returns SerpAPI errors (mirrors run_checks.py behaviour)
+_had_errors = False
+
 os.environ["WERKZEUG_RUN_MAIN"] = "true"
 sys.path.insert(0, os.path.dirname(__file__))
 
@@ -44,6 +47,8 @@ with app.app_context():
         flights, errors = fetch_all_flights(preset)
         if errors:
             print(f"  SerpAPI errors: {errors}")
+            global _had_errors
+            _had_errors = True
         direct   = sorted([f for f in flights if f["stops"] == 0], key=lambda x: x["price"])[:5]
         indirect = sorted([f for f in flights if f["stops"] > 0],  key=lambda x: x["price"])[:5]
         all_results[key] = {"name": name, "date": dep_date, "direct": direct, "indirect": indirect, "total": len(flights)}
@@ -70,3 +75,6 @@ with app.app_context():
                 print(f"    {i}. {carrier:30s}  {stops} stop{'s' if stops!=1 else ''}  {fmt_dur(f.get('duration_minutes')):8s}  £{f['price']:,.0f}")
         else:
             print("    No indirect flights found")
+
+if _had_errors:
+    sys.exit(1)

@@ -48,7 +48,8 @@ def manual_trigger():
     try:
         from app.services.price_checker import run_all_active_presets
         summaries = run_all_active_presets()
-        AppSetting.set("last_run_at", datetime.utcnow().strftime("%Y-%m-%d %H:%M UTC"))
+        from datetime import timezone as _tz
+        AppSetting.set("last_run_at", datetime.now(_tz.utc).strftime("%Y-%m-%d %H:%M UTC"))
         return jsonify({"status": "ok", "results": summaries})
     except Exception as exc:
         return jsonify({"status": "error", "message": str(exc)}), 500
@@ -58,7 +59,16 @@ def manual_trigger():
 def debug_search(preset_id):
     """Fire a raw SerpAPI call for the preset's first future date and return
     exactly what was sent and what came back. Use this to diagnose 'no results'
-    issues without digging through server logs."""
+    issues without digging through server logs.
+
+    Only available when DEBUG_ROUTES env var is set (never exposed in production
+    unless explicitly opted in).
+    """
+    import os
+    from flask import abort
+    if not current_app.debug and not os.environ.get("DEBUG_ROUTES"):
+        abort(403)
+
     from app.services.amadeus_client import CABIN_CLASS_MAP, CITY_TO_AIRPORT, SERPAPI_URL, _get_currency
 
     preset = db.get_or_404(SearchPreset, preset_id)

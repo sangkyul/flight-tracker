@@ -2,6 +2,7 @@ from datetime import date, datetime
 from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify
 from app.database import db
 from app.models import SearchPreset, PriceRecord
+from app.services.amadeus_client import CITY_TO_AIRPORT
 
 bp = Blueprint("presets", __name__)
 
@@ -73,10 +74,16 @@ def _validate_preset(form) -> list[str]:
 def _build_preset_from_form(form) -> dict:
     threshold = form.get("price_threshold", "").strip()
     airline = form.get("preferred_airline", "").strip().upper()
+    raw_origin = form.get("origin", "").strip().upper()
+    raw_dest = form.get("destination", "").strip().upper()
+    # Resolve city meta-codes (e.g. LON→LHR) so stored values always match
+    # what the search API accepts. Google Flights rejects city-level codes.
+    origin = CITY_TO_AIRPORT.get(raw_origin, raw_origin)
+    destination = CITY_TO_AIRPORT.get(raw_dest, raw_dest)
     return {
-        "label": form.get("label", "").strip() or f"{form.get('origin','').upper()}→{form.get('destination','').upper()}",
-        "origin": form.get("origin", "").strip().upper(),
-        "destination": form.get("destination", "").strip().upper(),
+        "label": form.get("label", "").strip() or f"{origin}→{destination}",
+        "origin": origin,
+        "destination": destination,
         "depart_date_from": _parse_date(form.get("depart_date_from")),
         "depart_date_to": _parse_date(form.get("depart_date_to")) or _parse_date(form.get("depart_date_from")),
         "return_date_from": _parse_date(form.get("return_date_from")) or None,

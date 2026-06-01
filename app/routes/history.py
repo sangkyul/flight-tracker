@@ -4,7 +4,7 @@ from datetime import datetime
 from flask import Blueprint, render_template
 from app.database import db
 from app.models import SearchPreset, PriceRecord, AppSetting
-from app.services.alert_engine import compute_rolling_average
+from app.services.analytics import compute_rolling_average
 
 bp = Blueprint("history", __name__)
 

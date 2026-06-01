@@ -33,6 +33,10 @@ with app.app_context():
     if not os.environ.get("DATABASE_URL"):
         os.makedirs(os.path.join(os.path.dirname(__file__), "instance"), exist_ok=True)
     db.create_all()
+    # Note: the `alert_log` table may still exist in the database from earlier
+    # versions. It is intentionally unused — the AlertLog model and all alert
+    # logic were removed. The table can be dropped manually if desired:
+    #   DROP TABLE IF EXISTS alert_log;
     seed_default_settings()
     # Add sort_order column if upgrading from an older DB
     try:
