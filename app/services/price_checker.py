@@ -50,9 +50,16 @@ def check_preset(preset) -> dict:
         )
         return base
 
-    all_flights = fetch_all_flights(preset)
+    all_flights, api_errors = fetch_all_flights(preset)
 
     if not all_flights:
+        if api_errors:
+            # SerpAPI returned explicit error messages — surface them instead of "no results"
+            base["error"] = "SerpAPI returned no results: " + " | ".join(api_errors)
+        elif preset.depart_date_to < date.today():
+            base["error"] = (
+                "All departure dates are in the past — edit the route to use future dates."
+            )
         return base
 
     now = datetime.utcnow()

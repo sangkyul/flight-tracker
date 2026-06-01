@@ -24,11 +24,11 @@ CABIN_CLASS_MAP = {
 
 
 
-def _fetch_flights_for_date(preset, departure_date: date) -> list[dict]:
-    """Return all flight offers for a single departure date, sorted by price."""
+def _fetch_flights_for_date(preset, departure_date: date) -> tuple[list[dict], str | None]:
+    """Return (flights, error_or_None) for a single departure date."""
     api_key = current_app.config.get("SERPAPI_KEY", "")
     if not api_key:
-        return []
+        return [], None  # handled upstream
 
     is_round_trip = bool(preset.return_date_from)
     params = {
@@ -49,18 +49,26 @@ def _fetch_flights_for_date(preset, departure_date: date) -> list[dict]:
     if preset.preferred_airline:
         params["include_airlines"] = preset.preferred_airline.upper()
 
+    # Log everything except the API key so it's easy to reproduce in a browser/curl
+    log_params = {k: v for k, v in params.items() if k != "api_key"}
+    logger.info("SerpAPI search: %s", log_params)
+
     try:
         resp = requests.get(SERPAPI_URL, params=params, timeout=30)
         resp.raise_for_status()
         data = resp.json()
+        logger.debug("SerpAPI response keys: %s", list(data.keys()))
         if "error" in data:
-            logger.warning("SerpAPI error for %s→%s on %s: %s",
-                           preset.origin, preset.destination, departure_date, data["error"])
-            return []
+            msg = data["error"]
+            logger.warning("SerpAPI error for %s→%s %s (class=%s): %s",
+                           preset.origin, preset.destination, departure_date,
+                           preset.cabin_class, msg)
+            return [], msg
     except Exception as exc:
-        logger.error("SerpAPI request failed for %s→%s on %s: %s",
-                     preset.origin, preset.destination, departure_date, exc)
-        return []
+        logger.error("SerpAPI request failed for %s→%s %s (class=%s): %s",
+                     preset.origin, preset.destination, departure_date,
+                     preset.cabin_class, exc)
+        return [], None
 
     raw_offers = data.get("best_flights", []) + data.get("other_flights", [])
     results = []
@@ -102,25 +110,29 @@ def _fetch_flights_for_date(preset, departure_date: date) -> list[dict]:
             "raw_response": json.dumps(offer),
         })
 
-    return sorted(results, key=lambda f: f["price"])
+    return sorted(results, key=lambda f: f["price"]), None
 
 
-def fetch_all_flights(preset) -> list[dict]:
+def fetch_all_flights(preset) -> tuple[list[dict], list[str]]:
     """Search every date in the preset's departure window.
 
-    Returns a flat list of all offers found, across all dates.
+    Returns (flights, errors) where errors is a deduplicated list of any
+    SerpAPI error messages received across the date range.
     """
-    all_results = []
+    all_results: list[dict] = []
+    errors: list[str] = []
     today = date.today()
     d = preset.depart_date_from
 
     while d <= preset.depart_date_to:
         if d >= today:
-            day_results = _fetch_flights_for_date(preset, d)
+            day_results, error = _fetch_flights_for_date(preset, d)
             all_results.extend(day_results)
+            if error and error not in errors:
+                errors.append(error)
             time.sleep(0.5)
         d += timedelta(days=1)
 
-    return all_results
+    return all_results, errors
 
 
