@@ -3,13 +3,11 @@ from app.models import AppSetting
 
 bp = Blueprint("settings", __name__)
 
-SETTING_KEYS = ["alert_email", "search_hour", "rolling_avg_days", "rolling_avg_pct"]
+SETTING_KEYS = ["search_hour", "rolling_avg_days"]
 
 DEFAULTS = {
-    "alert_email": "",
     "search_hour": "7",
     "rolling_avg_days": "30",
-    "rolling_avg_pct": "5",
 }
 
 
@@ -41,14 +39,6 @@ def save():
     except ValueError:
         errors.append("Rolling average window must be a positive integer.")
 
-    pct = request.form.get("rolling_avg_pct", "20").strip()
-    try:
-        p = float(pct)
-        if p <= 0:
-            raise ValueError
-    except ValueError:
-        errors.append("Alert percentage must be a positive number.")
-
     if errors:
         settings = {k: request.form.get(k, DEFAULTS.get(k, "")) for k in SETTING_KEYS}
         masked_key = "****"
@@ -56,12 +46,9 @@ def save():
             flash(err, "danger")
         return render_template("settings.html", settings=settings, masked_key=masked_key)
 
-    AppSetting.set("alert_email", request.form.get("alert_email", "").strip())
     AppSetting.set("search_hour", hour)
     AppSetting.set("rolling_avg_days", days)
-    AppSetting.set("rolling_avg_pct", pct)
 
-    # Reschedule the daily job if the hour changed
     try:
         from app.scheduler import reschedule_daily_job
         reschedule_daily_job(int(hour))

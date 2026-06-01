@@ -25,9 +25,6 @@ class SearchPreset(db.Model):
     price_records = db.relationship(
         "PriceRecord", backref="preset", cascade="all, delete-orphan", lazy="select"
     )
-    alert_logs = db.relationship(
-        "AlertLog", backref="preset", cascade="all, delete-orphan", lazy="select"
-    )
 
     @property
     def latest_price(self):
@@ -58,24 +55,6 @@ class PriceRecord(db.Model):
     return_date = db.Column(db.Date, nullable=True)
     stops = db.Column(db.Integer, nullable=False, default=0)
     raw_response = db.Column(db.Text, nullable=True)
-
-    alert_log = db.relationship("AlertLog", backref="price_record", uselist=False)
-
-
-class AlertLog(db.Model):
-    __tablename__ = "alert_log"
-
-    id = db.Column(db.Integer, primary_key=True)
-    preset_id = db.Column(
-        db.Integer, db.ForeignKey("search_preset.id", ondelete="CASCADE"), nullable=False
-    )
-    price_record_id = db.Column(
-        db.Integer, db.ForeignKey("price_record.id", ondelete="CASCADE"), nullable=True
-    )
-    sent_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
-    trigger_reason = db.Column(db.String(50), nullable=False)
-    email_recipient = db.Column(db.String(120), nullable=False)
-
 
 class AppSetting(db.Model):
     __tablename__ = "app_settings"

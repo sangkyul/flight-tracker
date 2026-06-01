@@ -3,22 +3,10 @@ from datetime import datetime, date
 from flask import current_app
 
 from app.database import db
-from app.models import SearchPreset, PriceRecord, AlertLog, AppSetting
+from app.models import SearchPreset, PriceRecord
 from app.services.amadeus_client import fetch_all_flights
-from app.services.alert_engine import should_alert
-from app.services.email_service import send_alert
 
 logger = logging.getLogger(__name__)
-
-
-def _get_setting(key, default):
-    val = AppSetting.get(key)
-    if val is None:
-        return default
-    try:
-        return type(default)(val)
-    except (ValueError, TypeError):
-        return default
 
 
 def _clean(flight: dict) -> dict:
@@ -29,9 +17,9 @@ def _clean(flight: dict) -> dict:
 def check_preset(preset) -> dict:
     """Run one search cycle for a preset.
 
-    Saves the cheapest price to the DB, fires an alert if warranted,
-    and returns a display-ready summary including top-5 direct and
-    top-5 non-direct flights.
+    Saves the cheapest direct and cheapest indirect price to the DB and
+    returns a display-ready summary including top-5 direct and top-5
+    indirect flights.
     """
     base = {
         "preset_id": preset.id,
@@ -40,7 +28,6 @@ def check_preset(preset) -> dict:
         "direct": [],
         "indirect": [],
         "checked": 0,
-        "alerted": False,
     }
 
     if not current_app.config.get("SERPAPI_KEY", ""):
@@ -69,7 +56,6 @@ def check_preset(preset) -> dict:
     indirects = [f for f in all_flights if f["stops"] > 0]
     cheapest_direct   = min(directs,   key=lambda f: f["price"]) if directs   else None
     cheapest_indirect = min(indirects, key=lambda f: f["price"]) if indirects else None
-    cheapest = min(all_flights, key=lambda f: f["price"])
 
     def _make_record(flight):
         outbound_date = None
@@ -94,64 +80,19 @@ def check_preset(preset) -> dict:
         )
 
     # Save cheapest direct and cheapest indirect separately for charting
-    direct_record = None
-    indirect_record = None
     for flight in filter(None, [cheapest_direct, cheapest_indirect]):
-        r = _make_record(flight)
-        db.session.add(r)
-        if flight is cheapest_direct:
-            direct_record = r
-        else:
-            indirect_record = r
-    db.session.flush()
-
-    # Alert record matches whichever flight is the overall cheapest
-    if cheapest is cheapest_direct:
-        alert_record = direct_record
-    elif cheapest is cheapest_indirect:
-        alert_record = indirect_record
-    else:
-        alert_record = direct_record or indirect_record
-
-    # --- Alert logic (based on overall cheapest price) ---
-    rolling_avg_days = _get_setting("rolling_avg_days", 30)
-    rolling_avg_pct  = _get_setting("rolling_avg_pct", 5.0)
-    alert_email = AppSetting.get("alert_email") or current_app.config["ALERT_EMAIL"]
-
-    fire, reason, avg = should_alert(
-        preset, cheapest["price"],
-        rolling_avg_days=rolling_avg_days,
-        rolling_avg_pct=rolling_avg_pct,
-    )
-
-    alerted = False
-    if fire and alert_record:
-        success = send_alert(preset, alert_record, reason, avg)
-        if success:
-            db.session.add(AlertLog(
-                preset_id=preset.id,
-                price_record_id=alert_record.id,
-                sent_at=datetime.utcnow(),
-                trigger_reason=reason,
-                email_recipient=alert_email,
-            ))
-            alerted = True
+        db.session.add(_make_record(flight))
 
     db.session.commit()
 
-    # --- Build display lists ---
-    direct = sorted(
-        [f for f in all_flights if f["stops"] == 0], key=lambda f: f["price"]
-    )[:5]
-    indirect = sorted(
-        [f for f in all_flights if f["stops"] > 0], key=lambda f: f["price"]
-    )[:5]
+    # Build display lists (top 5 cheapest of each type)
+    direct = sorted(directs,   key=lambda f: f["price"])[:5]
+    indirect = sorted(indirects, key=lambda f: f["price"])[:5]
 
     return {
         **base,
         "checked": len(all_flights),
-        "alerted": alerted,
-        "direct": [_clean(f) for f in direct],
+        "direct":   [_clean(f) for f in direct],
         "indirect": [_clean(f) for f in indirect],
     }
 
@@ -175,6 +116,5 @@ def run_all_active_presets() -> list[dict]:
                 "direct": [],
                 "indirect": [],
                 "checked": 0,
-                "alerted": False,
             })
     return summaries

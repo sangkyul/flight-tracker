@@ -3,7 +3,7 @@ from collections import defaultdict
 from datetime import datetime
 from flask import Blueprint, render_template
 from app.database import db
-from app.models import SearchPreset, PriceRecord, AlertLog, AppSetting
+from app.models import SearchPreset, PriceRecord, AppSetting
 from app.services.alert_engine import compute_rolling_average
 
 bp = Blueprint("history", __name__)
@@ -20,38 +20,28 @@ def view(preset_id):
         .all()
     )
 
-    alerted_record_ids = {
-        log.price_record_id
-        for log in AlertLog.query.filter_by(preset_id=preset_id).all()
-        if log.price_record_id
-    }
-
     prices = [r.price for r in records]
     record_currency = records[0].currency if records else None
-    lowest_price = min(prices) if prices else None
-    rolling_avg          = compute_rolling_average(preset_id, currency=current_currency)
-    rolling_avg_direct   = compute_rolling_average(preset_id, currency=current_currency, stops=0)
-    rolling_avg_indirect = compute_rolling_average(preset_id, currency=current_currency, stops=1)
-    alerts_sent = AlertLog.query.filter_by(preset_id=preset_id).count()
+    lowest_price          = min(prices) if prices else None
+    rolling_avg_direct    = compute_rolling_average(preset_id, currency=current_currency, stops=0)
+    rolling_avg_indirect  = compute_rolling_average(preset_id, currency=current_currency, stops=1)
 
     # Latest price: most recent direct, fallback to most recent indirect
     latest_direct   = next((r for r in records if r.stops == 0), None)
     latest_indirect = next((r for r in records if r.stops > 0),  None)
     latest_price = (latest_direct or latest_indirect).price if (latest_direct or latest_indirect) else None
 
-    # Group records by check timestamp for the table (direct + connecting side-by-side)
+    # Group records by check timestamp (direct + connecting side-by-side)
     by_check: dict = {}
     for r in records:  # already ordered desc
         key = r.checked_at.replace(microsecond=0)
         if key not in by_check:
-            by_check[key] = {"checked_at": r.checked_at, "direct": None, "indirect": None, "alerted": False}
+            by_check[key] = {"checked_at": r.checked_at, "direct": None, "indirect": None}
         if r.stops == 0:
             by_check[key]["direct"] = r
         else:
             by_check[key]["indirect"] = r
-        if r.id in alerted_record_ids:
-            by_check[key]["alerted"] = True
-    grouped_records = list(by_check.values())  # already desc from records order
+    grouped_records = list(by_check.values())
 
     # Build chart series: one point per day, cheapest direct + cheapest indirect
     by_date = defaultdict(lambda: {"direct": None, "indirect": None})
@@ -74,14 +64,11 @@ def view(preset_id):
         preset=preset,
         records=records,
         grouped_records=grouped_records,
-        alerted_record_ids=alerted_record_ids,
         latest_price=latest_price,
         record_currency=record_currency,
         lowest_price=lowest_price,
-        rolling_avg=rolling_avg,
         rolling_avg_direct=rolling_avg_direct,
         rolling_avg_indirect=rolling_avg_indirect,
-        alerts_sent=alerts_sent,
         chart_labels=json.dumps(chart_labels),
         chart_direct=json.dumps(chart_direct),
         chart_indirect=json.dumps(chart_indirect),

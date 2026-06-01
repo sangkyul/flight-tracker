@@ -32,8 +32,8 @@ with app.app_context():
             errors += 1
         else:
             logger.info(
-                "Preset '%s': %d flights found, alerted=%s",
-                r.get("preset_label"), r.get("checked", 0), r.get("alerted"),
+                "Preset '%s': %d flights found",
+                r.get("preset_label"), r.get("checked", 0),
             )
 
     logger.info("Done. %d preset(s) checked, %d error(s).", len(results), errors)

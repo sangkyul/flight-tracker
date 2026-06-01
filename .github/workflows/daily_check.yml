@@ -24,10 +24,7 @@ jobs:
 
       - name: Run price checks
         env:
-          DATABASE_URL:        ${{ secrets.DATABASE_URL }}
-          SERPAPI_KEY:         ${{ secrets.SERPAPI_KEY }}
-          GMAIL_ADDRESS:       ${{ secrets.GMAIL_ADDRESS }}
-          GMAIL_APP_PASSWORD:  ${{ secrets.GMAIL_APP_PASSWORD }}
-          ALERT_EMAIL:         ${{ secrets.ALERT_EMAIL }}
-          SECRET_KEY:          ${{ secrets.SECRET_KEY }}
+          DATABASE_URL:  ${{ secrets.DATABASE_URL }}
+          SERPAPI_KEY:   ${{ secrets.SERPAPI_KEY }}
+          SECRET_KEY:    ${{ secrets.SECRET_KEY }}
         run: python run_checks.py

@@ -45,12 +45,6 @@
       <div class="fw-bold fs-4 text-success">{{ (record_currency|currency_sym) + (lowest_price|fmt_price) if lowest_price else '—' }}</div>
     </div>
   </div>
-  <div class="col-6 col-md-3">
-    <div class="card text-center p-3">
-      <div class="text-muted small mb-1">Alerts Sent</div>
-      <div class="fw-bold fs-4">{{ alerts_sent }}</div>
-    </div>
-  </div>
 </div>
 
 {% if records %}
@@ -71,12 +65,11 @@
           <th>Checked</th>
           <th class="text-primary">Direct</th>
           <th class="text-secondary">Connecting</th>
-          <th>Alert</th>
         </tr>
       </thead>
       <tbody>
         {% for row in grouped_records %}
-        <tr {% if row.alerted %}class="table-success"{% endif %}>
+        <tr>
           <td class="text-nowrap">{{ row.checked_at.strftime('%b %d, %H:%M') }} UTC</td>
 
           {# Direct column #}
@@ -101,13 +94,6 @@
             {% endif %}
           </td>
 
-          <td>
-            {% if row.alerted %}
-              <span class="badge bg-success"><i class="bi bi-bell-fill"></i> Sent</span>
-            {% else %}
-              <span class="text-muted">—</span>
-            {% endif %}
-          </td>
         </tr>
         {% endfor %}
       </tbody>

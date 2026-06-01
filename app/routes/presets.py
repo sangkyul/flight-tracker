@@ -1,7 +1,7 @@
 from datetime import date, datetime
 from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify
 from app.database import db
-from app.models import SearchPreset, PriceRecord, AlertLog  # db.get_or_404 used throughout
+from app.models import SearchPreset, PriceRecord
 
 bp = Blueprint("presets", __name__)
 
@@ -132,7 +132,6 @@ def update(preset_id):
         setattr(preset, key, val)
     # Clear history and reset tracking start date
     PriceRecord.query.filter_by(preset_id=preset_id).delete()
-    AlertLog.query.filter_by(preset_id=preset_id).delete()
     preset.created_at = datetime.utcnow()
     db.session.commit()
     flash(f"Route '{preset.label}' updated — history cleared, running fresh search now.", "success")

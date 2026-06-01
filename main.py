@@ -18,8 +18,6 @@ def seed_default_settings():
     defaults = {
         "search_hour": "7",
         "rolling_avg_days": "30",
-        "rolling_avg_pct": "5",
-        "alert_email": app.config.get("ALERT_EMAIL", ""),
         "currency": "GBP",
         "last_run_at": "Never",
         "next_run_at": "Unknown",
@@ -27,10 +25,6 @@ def seed_default_settings():
     for key, value in defaults.items():
         if db.session.get(AppSetting, key) is None:
             db.session.add(AppSetting(key=key, value=value))
-    # Force rolling_avg_pct to 5 if it's still at the old 20 default
-    row = db.session.get(AppSetting, "rolling_avg_pct")
-    if row and row.value == "20":
-        row.value = "5"
     db.session.commit()
 
 

@@ -30,8 +30,4 @@ class Config:
 
     SERPAPI_KEY = os.environ.get("SERPAPI_KEY", "")
 
-    GMAIL_ADDRESS = os.environ.get("GMAIL_ADDRESS", "")
-    GMAIL_APP_PASSWORD = os.environ.get("GMAIL_APP_PASSWORD", "")
-    ALERT_EMAIL = os.environ.get("ALERT_EMAIL", os.environ.get("GMAIL_ADDRESS", ""))
-
     SEARCH_HOUR = int(os.environ.get("SEARCH_HOUR", 7))

@@ -255,10 +255,6 @@ function renderResults(results) {
     const directHtml  = buildFlightTable(r.direct,   cheapestPrice);
     const indirectHtml = buildFlightTable(r.indirect, cheapestPrice);
 
-    const alertBadge = r.alerted
-      ? '<span class="badge bg-success ms-2"><i class="bi bi-bell-fill"></i> Alert sent</span>'
-      : '';
-
     const countText = r.checked
       ? `<span class="text-muted small ms-2">${r.checked} offer${r.checked !== 1 ? 's' : ''} found</span>`
       : '';
@@ -269,7 +265,7 @@ function renderResults(results) {
       <div class="card-header d-flex align-items-center gap-2 fw-semibold">
         <i class="bi bi-airplane text-primary"></i>
         ${r.preset_label || r.preset_route}
-        ${countText}${alertBadge}
+        ${countText}
       </div>
       <div class="card-body p-0">
         ${errorHtml}
@@ -320,9 +316,8 @@ document.getElementById('runNowBtn').addEventListener('click', function () {
 
       if (data.status === 'ok') {
         const results = data.results || [];
-        const alerted = results.filter(r => r.alerted).length;
         status.className = 'alert alert-success mt-4';
-        status.innerHTML = `Search complete — ${results.length} route(s) checked, ${alerted} alert(s) sent.`;
+        status.innerHTML = `Search complete — ${results.length} route(s) checked.`;
         status.style.display = 'block';
         if (results.length) { renderResults(results); updateTilePrices(results); }
       } else {
