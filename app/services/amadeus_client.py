@@ -9,6 +9,28 @@ from flask import current_app
 logger = logging.getLogger(__name__)
 SERPAPI_URL = "https://serpapi.com/search"
 
+# Google Flights rejects many city meta-codes (LON, NYC, PAR…) and needs a
+# real IATA airport code.  Map the most common offenders to their primary airport.
+CITY_TO_AIRPORT: dict[str, str] = {
+    "LON": "LHR",  # London → Heathrow
+    "NYC": "JFK",  # New York → JFK
+    "PAR": "CDG",  # Paris → Charles de Gaulle
+    "MIL": "MXP",  # Milan → Malpensa
+    "ROM": "FCO",  # Rome → Fiumicino
+    "BUE": "EZE",  # Buenos Aires → Ezeiza
+    "MOW": "SVO",  # Moscow → Sheremetyevo
+    "OSA": "KIX",  # Osaka → Kansai
+    "TYO": "NRT",  # Tokyo → Narita
+    "SEL": "ICN",  # Seoul → Incheon
+    "WAS": "IAD",  # Washington → Dulles
+    "CHI": "ORD",  # Chicago → O'Hare
+    "STO": "ARN",  # Stockholm → Arlanda
+    "BJS": "PEK",  # Beijing → Capital
+    "SHA": "PVG",  # Shanghai → Pudong
+    "YTO": "YYZ",  # Toronto → Pearson
+    "YMQ": "YUL",  # Montreal → Trudeau
+}
+
 
 def _get_currency() -> str:
     from app.models import AppSetting
@@ -31,10 +53,19 @@ def _fetch_flights_for_date(preset, departure_date: date) -> tuple[list[dict], s
         return [], None  # handled upstream
 
     is_round_trip = bool(preset.return_date_from)
+
+    # Resolve city meta-codes (LON, NYC…) to a specific airport Google Flights accepts
+    origin_id = CITY_TO_AIRPORT.get(preset.origin, preset.origin)
+    destination_id = CITY_TO_AIRPORT.get(preset.destination, preset.destination)
+    if origin_id != preset.origin:
+        logger.info("Resolved city code %s → %s for SerpAPI", preset.origin, origin_id)
+    if destination_id != preset.destination:
+        logger.info("Resolved city code %s → %s for SerpAPI", preset.destination, destination_id)
+
     params = {
         "engine": "google_flights",
-        "departure_id": preset.origin,
-        "arrival_id": preset.destination,
+        "departure_id": origin_id,
+        "arrival_id": destination_id,
         "outbound_date": departure_date.isoformat(),
         "type": 1 if is_round_trip else 2,
         "travel_class": CABIN_CLASS_MAP.get(preset.cabin_class, 1),

@@ -59,7 +59,7 @@ def debug_search(preset_id):
     """Fire a raw SerpAPI call for the preset's first future date and return
     exactly what was sent and what came back. Use this to diagnose 'no results'
     issues without digging through server logs."""
-    from app.services.amadeus_client import CABIN_CLASS_MAP, SERPAPI_URL, _get_currency
+    from app.services.amadeus_client import CABIN_CLASS_MAP, CITY_TO_AIRPORT, SERPAPI_URL, _get_currency
 
     preset = db.get_or_404(SearchPreset, preset_id)
     api_key = current_app.config.get("SERPAPI_KEY", "")
@@ -79,11 +79,15 @@ def debug_search(preset_id):
             "depart_date_to": preset.depart_date_to.isoformat(),
         }), 400
 
+    # Apply same city-code resolution as the real search
+    origin_id = CITY_TO_AIRPORT.get(preset.origin, preset.origin)
+    destination_id = CITY_TO_AIRPORT.get(preset.destination, preset.destination)
+
     is_round_trip = bool(preset.return_date_from)
     params = {
         "engine": "google_flights",
-        "departure_id": preset.origin,
-        "arrival_id": preset.destination,
+        "departure_id": origin_id,
+        "arrival_id": destination_id,
         "outbound_date": d.isoformat(),
         "type": 1 if is_round_trip else 2,
         "travel_class": CABIN_CLASS_MAP.get(preset.cabin_class, 1),
@@ -111,6 +115,12 @@ def debug_search(preset_id):
     other = data.get("other_flights", [])
     all_flights = best + other
 
+    substitutions = {}
+    if origin_id != preset.origin:
+        substitutions[preset.origin] = origin_id
+    if destination_id != preset.destination:
+        substitutions[preset.destination] = destination_id
+
     return jsonify({
         "preset": {
             "id": preset.id,
@@ -121,6 +131,7 @@ def debug_search(preset_id):
             "direct_only": preset.direct_only,
             "preferred_airline": preset.preferred_airline,
         },
+        "city_code_substitutions": substitutions,
         "date_searched": d.isoformat(),
         "params_sent": safe_params,
         "serpapi_response": {
