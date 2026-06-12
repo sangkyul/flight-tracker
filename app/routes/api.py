@@ -1,7 +1,8 @@
-from datetime import datetime, date, timedelta
+import os
+from datetime import datetime, date, timedelta, timezone
 from urllib.parse import urlencode
 import requests as req_lib
-from flask import Blueprint, jsonify, request, current_app
+from flask import Blueprint, jsonify, request, current_app, abort
 from app.models import AppSetting, SearchPreset
 from app.database import db
 from app.scheduler import scheduler
@@ -36,7 +37,6 @@ def manual_trigger():
     last_run = AppSetting.get("last_run_at", "Never")
     if last_run and last_run != "Never":
         try:
-            from datetime import timezone
             last_dt = datetime.strptime(last_run, "%Y-%m-%d %H:%M UTC").replace(tzinfo=timezone.utc)
             elapsed = (datetime.now(timezone.utc) - last_dt).total_seconds()
             if elapsed < 300:
@@ -48,8 +48,7 @@ def manual_trigger():
     try:
         from app.services.price_checker import run_all_active_presets
         summaries = run_all_active_presets()
-        from datetime import timezone as _tz
-        AppSetting.set("last_run_at", datetime.now(_tz.utc).strftime("%Y-%m-%d %H:%M UTC"))
+        AppSetting.set("last_run_at", datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC"))
         return jsonify({"status": "ok", "results": summaries})
     except Exception as exc:
         return jsonify({"status": "error", "message": str(exc)}), 500
@@ -64,8 +63,6 @@ def debug_search(preset_id):
     Only available when DEBUG_ROUTES env var is set (never exposed in production
     unless explicitly opted in).
     """
-    import os
-    from flask import abort
     if not current_app.debug and not os.environ.get("DEBUG_ROUTES"):
         abort(403)
 

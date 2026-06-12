@@ -47,7 +47,6 @@ with app.app_context():
         flights, errors = fetch_all_flights(preset)
         if errors:
             print(f"  SerpAPI errors: {errors}")
-            global _had_errors
             _had_errors = True
         direct   = sorted([f for f in flights if f["stops"] == 0], key=lambda x: x["price"])[:5]
         indirect = sorted([f for f in flights if f["stops"] > 0],  key=lambda x: x["price"])[:5]
