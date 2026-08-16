@@ -29,9 +29,14 @@ def seed_default_settings():
 
 
 with app.app_context():
-    # instance/ dir only needed for local SQLite — skip on PostgreSQL (Vercel/production)
-    if not os.environ.get("DATABASE_URL"):
-        os.makedirs(os.path.join(os.path.dirname(__file__), "instance"), exist_ok=True)
+    # instance/ dir only needed for local SQLite. Decide from the resolved DB URI
+    # (not just the env var) and never let a read-only serverless filesystem
+    # (e.g. Vercel's /var/task) crash startup.
+    if app.config["SQLALCHEMY_DATABASE_URI"].startswith("sqlite"):
+        try:
+            os.makedirs(os.path.join(os.path.dirname(__file__), "instance"), exist_ok=True)
+        except OSError as exc:
+            logging.warning("Could not create instance dir (read-only FS?): %s", exc)
     db.create_all()
     # Note: the `alert_log` table may still exist in the database from earlier
     # versions. It is intentionally unused — the AlertLog model and all alert
