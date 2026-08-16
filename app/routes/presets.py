@@ -2,7 +2,7 @@ from datetime import date, datetime
 from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify
 from app.database import db
 from app.models import SearchPreset, PriceRecord
-from app.services.amadeus_client import CITY_TO_AIRPORT
+from app.services.serpapi_client import CITY_TO_AIRPORT
 
 bp = Blueprint("presets", __name__)
 

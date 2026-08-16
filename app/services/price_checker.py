@@ -4,7 +4,7 @@ from flask import current_app
 
 from app.database import db
 from app.models import SearchPreset, PriceRecord
-from app.services.amadeus_client import fetch_all_flights
+from app.services.serpapi_client import fetch_all_flights
 
 logger = logging.getLogger(__name__)
 

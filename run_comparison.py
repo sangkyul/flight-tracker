@@ -10,7 +10,7 @@ os.environ["WERKZEUG_RUN_MAIN"] = "true"
 sys.path.insert(0, os.path.dirname(__file__))
 
 from app import create_app
-from app.services.amadeus_client import fetch_all_flights
+from app.services.serpapi_client import fetch_all_flights
 
 app = create_app()
 

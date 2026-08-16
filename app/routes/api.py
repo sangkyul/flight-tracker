@@ -66,7 +66,7 @@ def debug_search(preset_id):
     if not current_app.debug and not os.environ.get("DEBUG_ROUTES"):
         abort(403)
 
-    from app.services.amadeus_client import CABIN_CLASS_MAP, CITY_TO_AIRPORT, SERPAPI_URL, _get_currency
+    from app.services.serpapi_client import CABIN_CLASS_MAP, CITY_TO_AIRPORT, SERPAPI_URL, _get_currency
 
     preset = db.get_or_404(SearchPreset, preset_id)
     api_key = current_app.config.get("SERPAPI_KEY", "")

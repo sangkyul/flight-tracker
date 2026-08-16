@@ -15,9 +15,6 @@ __pycache__/
 .venv/
 venv/
 
-# Stray files
-=2.31
-
 # IDE
 .vscode/
 .idea/
