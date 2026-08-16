@@ -214,15 +214,20 @@ document.getElementById('submitBtn').addEventListener('click', function(e) {
 </script>
 {% else %}
 <script>
-// For new routes: commit typed dates before form submits, then disable to prevent double-submit
-document.getElementById('submitBtn').addEventListener('click', function() {
-  this.disabled = true;
-  this.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Adding…';
+// For new routes: commit typed dates, then submit explicitly. We must call
+// form.submit() ourselves — disabling a submit button inside its own click
+// handler cancels the browser's native submission (Chrome), so relying on the
+// default action leaves the form stuck on "Adding…" and never POSTs.
+document.getElementById('submitBtn').addEventListener('click', function(e) {
+  e.preventDefault();
   [fpDepartFrom, fpDepartTo, fpReturnFrom, fpReturnTo].forEach(fp => {
     if (fp.altInput && fp.altInput.value && !fp.selectedDates[0]) {
       fp.setDate(fp.altInput.value, true, fp.config.altFormat);
     }
   });
+  this.disabled = true;
+  this.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Adding…';
+  this.closest('form').submit();
 });
 </script>
 {% endif %}
