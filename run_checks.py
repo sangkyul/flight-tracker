@@ -18,6 +18,18 @@ from app import create_app
 from app.database import db
 from app.services.price_checker import run_all_active_presets
 
+# In CI (GitHub Actions) there is no persistent local disk, so silently
+# falling back to SQLite just produces a cryptic "unable to open database
+# file" traceback. Fail loudly with an actionable message instead.
+if not os.environ.get("DATABASE_URL"):
+    logger.error(
+        "DATABASE_URL is not set. The daily check needs the shared Neon "
+        "database. Add DATABASE_URL (plus SERPAPI_KEY and SECRET_KEY) under "
+        "the repo's Settings > Secrets and variables > Actions > Repository "
+        "secrets, with names matching exactly."
+    )
+    sys.exit(1)
+
 app = create_app()
 
 with app.app_context():
